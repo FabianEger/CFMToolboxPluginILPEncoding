@@ -33,10 +33,19 @@ def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver
         max_upperbound = get_max_interval_value(feature.group_type_cardinality.intervals)
         min_lowerbound = get_min_interval_value(feature.group_type_cardinality.intervals)
 
-        constraint = solver.Constraint(min_lowerbound, max_upperbound)
+        constraint_lower = solver.Constraint(0, solver.infinity())
+        constraint_upper = solver.Constraint(-solver.infinity(), 0)
+
+        #constraint = solver.Constraint(min_lowerbound, max_upperbound)
 
         for child in feature.children:
-            constraint.SetCoefficient(solver.LookupVariable(creat_const_name_activ(child)),1)
+            constraint_lower.SetCoefficient(solver.LookupVariable(creat_const_name_activ(child)),1)
+            constraint_upper.SetCoefficient(solver.LookupVariable(creat_const_name_activ(child)),1)
+
+        constraint_lower.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+                                        -min_lowerbound)
+        constraint_upper.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+                                        -max_upperbound)
 
         for child in feature.children:
             create_ilp_constraints_for_group_type_cardinalities(child, solver)
@@ -130,7 +139,7 @@ def get_min_interval_value(intervals: list[Interval])-> int:
 
 def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
     for feature in cfm.features:
-        solver.NumVar(0,  1000, create_const_name(feature))
+        solver.NumVar(0,  10000000, create_const_name(feature)) # Big M is needed here
         solver.NumVar(0, 1, creat_const_name_activ(feature))
 
         constraint = solver.Constraint(-solver.infinity(), 0)
