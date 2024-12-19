@@ -11,7 +11,7 @@ def create_ilp_multiset_encoding(cfm: CFM):
     solver = pywraplp.Solver.CreateSolver("GLOP")
     if not solver:
         print("Could not create solver GLOP")
-        return
+        return None
 
     create_ilp_multiset_variables(cfm, solver)
     print("Number of variables =", solver.NumVariables())
@@ -25,10 +25,7 @@ def create_ilp_multiset_encoding(cfm: CFM):
     create_ilp_constraints_for_group_instance_cardinalities(cfm.root,solver)
     print("Number of constraints =", solver.NumConstraints())
 
-    solver.Maximize(solver.LookupVariable("Feature_Team") )
-    solver.Solve()
-    print(print(f"x = {solver.Objective().Value():0.1f}"))
-    print(solver.ExportModelAsLpFormat(False))
+    return solver
 
 def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver:Solver):
 
@@ -133,7 +130,7 @@ def get_min_interval_value(intervals: list[Interval])-> int:
 
 def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
     for feature in cfm.features:
-        solver.NumVar(0,  100, create_const_name(feature))
+        solver.NumVar(0,  1000, create_const_name(feature))
         solver.NumVar(0, 1, creat_const_name_activ(feature))
 
         constraint = solver.Constraint(-solver.infinity(), 0)
