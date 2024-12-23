@@ -180,6 +180,19 @@ def create_ilp_constraints(constraints: list[Constraint], solver:Solver):
             constraint.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(i) + "_"
              + str(
                 5)),1)
+        else:
+            # if the first feature is in the given Interval than the second needs to be in the
+            # given interval -> HelperIntervalConstFeature2 >= HelperIntervalConstFeature1 -> 0
+            # >= HelperIntervalConstFeature1 - HelperIntervalConstFeature2
+            create_constraint_for_intervals(solver,i,constraint.first_feature,constraint.first_cardinality.intervals,
+                                            Interval(1,3))
+            create_constraint_for_intervals(solver,i,constraint.second_feature,
+                                            constraint.second_cardinality.intervals,Interval(4,6))
+            constraint = solver.Constraint(-solver.infinity(), 0)
+            constraint.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(i) +
+                                                       "_" + str(2)),1)
+            constraint.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(i) +
+                                                       "_" + str(5)),-1)
 
 
 def create_constraint_for_intervals(solver:Solver, constraint_number:int, feature:Feature ,
