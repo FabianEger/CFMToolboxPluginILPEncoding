@@ -184,7 +184,8 @@ def create_ilp_constraints(constraints: list[Constraint], solver:Solver):
             # if the first feature is in the given Interval than the second needs to be in the
             # given interval -> HelperIntervalConstFeature2 >= HelperIntervalConstFeature1 -> 0
             # >= HelperIntervalConstFeature1 - HelperIntervalConstFeature2
-            create_constraint_for_intervals(solver,i,constraint.first_feature,constraint.first_cardinality.intervals,
+            create_constraint_for_intervals(solver,i,constraint.first_feature,
+             constraint.first_cardinality.intervals,
                                             Interval(1,3))
             create_constraint_for_intervals(solver,i,constraint.second_feature,
                                             constraint.second_cardinality.intervals,Interval(4,6))
@@ -203,10 +204,10 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
 
     global_active_feature_var_name = "helper_constraint_feature_global_active" + "_" + str(
         feature.name) + "_" + str(constraint_number)
-    solver.IntVar(0,1,global_active_feature_var_name)
+    solver.BoolVar(global_active_feature_var_name)
 
-    #solver.Add(x <= M * z)  # If z = 0, x <= 0
-    #solver.Add(x >= epsilon - M * (1 - z))  # If z = 1, x >= epsilon
+    # x <= M * z   If z = 0, x <= 0
+    #x >= epsilon - M * (1 - z)  # If z = 1, x >= epsilon
 
     global_constraint_upper = solver.Constraint(-solver.infinity(), big_M - 1)
     global_constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
@@ -236,9 +237,9 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
     exclude_lower = solver.Constraint(-solver.infinity(),0)
     exclude_lower.SetCoefficient(solver.LookupVariable(create_const_name(
         feature)), -1)
-    exclude_lower.SetCoefficient(solver.LookupVariable(global_active_feature_var_name),1)
+    exclude_lower.SetCoefficient(solver.LookupVariable(global_active_feature_var_name),-1)
     exclude_lower.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(constraint_number) +
-                                                       "_" + str(constants_interval.lower)),-1
+                                                       "_" + str(constants_interval.lower)),1
                                  )
     exclude_lower.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.lower + 1)),
