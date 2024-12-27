@@ -1,3 +1,5 @@
+from pyexpat import features
+
 from cfmtoolbox import CFM, Feature, Interval
 from cfmtoolbox.plugins.big_m import get_global_upper_bound
 from ortools.init.python import init
@@ -21,26 +23,40 @@ def create_ilp_multiset_encoding(cfm: CFM):
         return None
 
     create_ilp_multiset_variables(cfm, solver)
-    print("Number of variables =", solver.NumVariables())
+
 
     create_ilp_constraints_for_group_type_cardinalities(cfm.root,solver)
-    print("Number of constraints =", solver.NumConstraints())
+
 
     create_ilp_constraints_for_feature_instance_cardinalities(cfm.root,solver)
-    print("Number of constraints =", solver.NumConstraints())
+
 
     create_ilp_constraints_for_group_instance_cardinalities(cfm.root,solver)
-    print("Number of constraints =", solver.NumConstraints())
+
 
     create_ilp_constraints(cfm.constraints,solver)
 
+    #constraint = solver.Constraint(0,0)
+    #constraint.SetCoefficient(solver.LookupVariable("Feature_ingredients"),1)
+    print("Number of variables =", solver.NumVariables())
+    print("Number of constraints =", solver.NumConstraints())
     return solver
 
 
 def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver:Solver):
     global big_M
+    if feature.parent is None:
+        constraint = solver.Constraint(-solver.infinity(), big_M - 1)
+        constraint.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+                                  big_M)
+        constraint.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
+
+        constraint2 = solver.Constraint(0, solver.infinity())
+        constraint2.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+                                   big_M)
+        constraint2.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
+
     if len(feature.children) != 0:
-        # problem here is that it only checks the global interpretation
         max_upperbound = get_max_interval_value(feature.group_type_cardinality.intervals)
         min_lowerbound = get_min_interval_value(feature.group_type_cardinality.intervals)
 
@@ -52,6 +68,8 @@ def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver
 
         for child in feature.children:
 
+            # child >= parent - M  +  M * child_active  If child >= parent, child_active must be 1
+           # child <= parent - 1 + M * child_active  If child < parent, z must be 0
 
             constraint_upper_local = solver.Constraint(-solver.infinity(), big_M)
             constraint_upper_local.SetCoefficient(solver.LookupVariable(create_const_name(
@@ -85,9 +103,10 @@ def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver
             constraint_upper.SetCoefficient(solver.LookupVariable(creat_const_name_activ(child)),1)
 
 
-        constraint_lower.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+        constraint_lower.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),
                                         -min_lowerbound)
-        constraint_upper.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),
+        constraint_upper.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(
+            feature)),
                                         -max_upperbound)
 
         for child in feature.children:
@@ -103,14 +122,12 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
     max_upperbound = get_max_interval_value(feature_instance.instance_cardinality.intervals)
     min_lowerbound = get_min_interval_value(feature_instance.instance_cardinality.intervals)
 
-
-
     if feature_instance.parent is not None:
         constraint_lower = solver.Constraint(0, solver.infinity())
         constraint_lower.SetCoefficient(solver.LookupVariable(create_const_name(
-            feature_instance)),1)
+            feature_instance)), 1)
         constraint_lower.SetCoefficient(solver.LookupVariable(create_const_name(
-            feature_instance.parent)),-min_lowerbound)
+            feature_instance.parent)), -min_lowerbound)
 
         constraint_upper = solver.Constraint(-solver.infinity(), 0)
         constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(
@@ -120,19 +137,114 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
     else:
         constraint = solver.Constraint(min_lowerbound, max_upperbound)
         constraint.SetCoefficient(solver.LookupVariable(create_const_name(
-            feature_instance)),1)
+            feature_instance)), 1)
+
+    for child in feature_instance.children:
+        create_ilp_constraints_for_feature_instance_cardinalities(child, solver)
+
+    '''
+    only_one_interval_constraint = solver.Constraint(0, 0)
+    only_one_interval_constraint.SetCoefficient(solver.LookupVariable(
+        creat_const_name_activ_global(feature_instance)),-1)
+
+    if feature_instance.parent is not None:
+        constraint_lower = solver.Constraint(-solver.infinity(),0)
+        constraint_upper = solver.Constraint(0,solver.infinity())
+        max_upperbound = get_max_interval_value(feature_instance.parent.instance_cardinality.intervals)
+        min_lowerbound = get_min_interval_value(
+            feature_instance.parent.instance_cardinality.intervals)
+    else:
+        constraint = solver.Constraint(0, 0)
+
+    # Feature >= parent * interval.lower
+    #  Feature >= (helper * firstinterval.lower * parent) + (helper2 * secondinterval.lower *
+    #  parent)
+    # Feature <= helper * firstinterval + helper2 * secondinteval
+
+
+
+
+    for i,interval in enumerate(feature_instance.instance_cardinality.intervals):
+        helper_name = "helper_instance_interval_" + feature_instance.name + "_" + str(i)
+        solver.BoolVar(helper_name)
+        only_one_interval_constraint.SetCoefficient(solver.LookupVariable(helper_name), 1)
+
+        if feature_instance.parent is not None:
+            # Auxiliary variable
+            v = solver.IntVar(0, big_M, 'v_' +  feature_instance.name + "_" + str(i))  # v = parent
+            # * helper
+            l = solver.IntVar(v.lb() * interval.lower, v.ub() * interval.lower, 'lower_' +
+                              feature_instance.name + "_" + str(i))  # l
+            # = v * c
+            u = solver.IntVar(v.lb() * interval.upper, v.ub() * interval.upper, 'upper_' +
+                              feature_instance.name + "_" + str(i))  # u = v * c
+
+
+            # Step 1: Linearize v = parent * helper (McCormick Envelopes)
+            solver.Add(v >= min_lowerbound * solver.LookupVariable(helper_name))
+            solver.Add(v >= big_M * solver.LookupVariable(helper_name) + solver.LookupVariable(
+                create_const_name(feature_instance.parent)) - big_M)
+            solver.Add(v <= min_lowerbound * solver.LookupVariable(helper_name) +
+            solver.LookupVariable(
+                create_const_name(feature_instance.parent)) - min_lowerbound)
+            solver.Add(v <= big_M * solver.LookupVariable(helper_name))
+
+            
+            constraint_helper_lower = solver.Constraint(0,0)
+            constraint_helper_upper = solver.Constraint(0,0)
+
+            constraint_helper_lower.SetCoefficient(solver.LookupVariable("v_" +
+                                                                         feature_instance.name +
+                                                                         "_" + str(i)), interval.lower)
+            constraint_helper_lower.SetCoefficient(solver.LookupVariable('lower_' +
+                              feature_instance.name + "_" + str(i)),-1)
+
+            constraint_helper_upper.SetCoefficient(solver.LookupVariable("v_" +
+                                                                         feature_instance.name +
+                                                                         "_" + str(i)),
+                                                   interval.upper)
+            constraint_helper_upper.SetCoefficient(solver.LookupVariable('lower_' +
+                                                                         feature_instance.name + "_" + str(
+                i)), -1)
+            
+            solver.Add(l == interval.lower * v)
+            solver.Add(u == interval.upper * v)
+
+            constraint_lower.SetCoefficient(l,1)
+            constraint_upper.SetCoefficient(u,1)
+        else:
+            constraint.SetCoefficient(solver.LookupVariable(helper_name),interval.lower)
+
+    if feature_instance.parent is not None:
+
+        constraint_lower.SetCoefficient(solver.LookupVariable(create_const_name(
+            feature_instance)),-1)
+       # constraint_lower.SetCoefficient(solver.LookupVariable(create_const_name(
+        #    feature_instance.parent)),-min_lowerbound)
+
+
+        constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(
+            feature_instance)), -1)
+        #constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(
+         #   feature_instance.parent)), -max_upperbound)
+    else:
+        constraint.SetCoefficient(solver.LookupVariable(create_const_name(
+            feature_instance)), -1)
+
 
 
 
     for child in feature_instance.children:
         create_ilp_constraints_for_feature_instance_cardinalities(child, solver)
 
-
+    '''
 
 def create_ilp_constraints_for_group_instance_cardinalities(feature_instance: Feature,
                                                               solver:Solver):
     """
-        No compound intervals can be supported in the ILP encoding, which is why max and min need to be calculated
+        No compound intervals are supported in the ILP encoding for group instances, which is why
+        max and min
+        need to be calculated
     """
     if len(feature_instance.children) != 0:
         max_upperbound = get_max_interval_value(feature_instance.group_instance_cardinality.intervals)
@@ -202,20 +314,22 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
     for i in range(constants_interval.lower,constants_interval.upper+1):
         solver.BoolVar("helper_constraint_" + str(constraint_number) + "_" + str(i))
 
+    '''
     global_active_feature_var_name = "helper_constraint_feature_global_active" + "_" + str(
         feature.name) + "_" + str(constraint_number)
     solver.BoolVar(global_active_feature_var_name)
 
     # x <= M * z   If z = 0, x <= 0
     #x >= epsilon - M * (1 - z)  # If z = 1, x >= epsilon
-
+    
     global_constraint_upper = solver.Constraint(-solver.infinity(), big_M - 1)
     global_constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
     global_constraint_upper.SetCoefficient(solver.LookupVariable(global_active_feature_var_name), big_M)
     global_constraint_lower = solver.Constraint(0, solver.infinity())
     global_constraint_lower.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
     global_constraint_lower.SetCoefficient(solver.LookupVariable(global_active_feature_var_name), big_M)
-
+    
+    '''
 
 
     exclude_upper = solver.Constraint(0, solver.infinity())
@@ -237,7 +351,7 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
     exclude_lower = solver.Constraint(-solver.infinity(),0)
     exclude_lower.SetCoefficient(solver.LookupVariable(create_const_name(
         feature)), -1)
-    exclude_lower.SetCoefficient(solver.LookupVariable(global_active_feature_var_name),-1)
+    exclude_lower.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),-1)
     exclude_lower.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.lower)),1
                                  )
@@ -256,7 +370,7 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
                                                        "_" + str(constants_interval.lower + 1)), 1)
     excludes.SetCoefficient(solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.upper)), 1)
-    excludes.SetCoefficient(solver.LookupVariable(global_active_feature_var_name),
+    excludes.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),
                             -1)
 
 
@@ -289,14 +403,17 @@ def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
         # solver needs the variables to have a maximum
         solver.IntVar(0,1,creat_const_name_activ(feature))
 
-        #constraint = solver.Constraint(-solver.infinity(), 0)
-        #constraint.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),1)
-        #constraint.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
+        solver.IntVar(0,1,creat_const_name_activ_global(feature))
 
-        #constraint2 = solver.Constraint(0, solver.infinity())
-        #constraint2.SetCoefficient(solver.LookupVariable(creat_const_name_activ(feature)),big_M)
-        #constraint2.SetCoefficient(solver.LookupVariable(create_const_name(feature)),-1)
+        '''
+        constraint = solver.Constraint(-solver.infinity(), big_M - 1)
+        constraint.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),big_M)
+        constraint.SetCoefficient(solver.LookupVariable(create_const_name(feature)), -1)
 
+        constraint2 = solver.Constraint(0, solver.infinity())
+        constraint2.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),big_M)
+        constraint2.SetCoefficient(solver.LookupVariable(create_const_name(feature)),-1)
+        '''
 
 
 
@@ -306,3 +423,6 @@ def create_const_name(feature: Feature) -> str:
 
 def creat_const_name_activ(feature: Feature) -> str:
     return create_const_name(feature) + "_activ"
+
+def creat_const_name_activ_global(feature: Feature) -> str:
+    return create_const_name(feature) + "_activ_global"
