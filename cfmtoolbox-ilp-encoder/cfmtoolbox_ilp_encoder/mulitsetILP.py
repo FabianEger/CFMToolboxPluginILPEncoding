@@ -107,7 +107,7 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
         This needs to be changed by adding new variables like in the constraint definition.
     """
 
-    '''
+    ''' 
     max_upperbound = get_max_interval_value(feature_instance.instance_cardinality.intervals)
     min_lowerbound = get_min_interval_value(feature_instance.instance_cardinality.intervals)
 
@@ -141,7 +141,7 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
 
     if feature_instance.parent is not None:
         only_one_interval_constraint.SetCoefficient(solver.LookupVariable(
-            create_const_name_activ(feature_instance.parent)), -1)
+            create_const_name_activ_global(feature_instance.parent)), -1)
         constraint_lower = solver.Constraint(-solver.infinity(),0)
         constraint_upper = solver.Constraint(0,solver.infinity())
         max_upperbound = get_max_interval_value(feature_instance.parent.instance_cardinality.intervals)
@@ -149,7 +149,7 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
             feature_instance.parent.instance_cardinality.intervals)
     else:
         only_one_interval_constraint.SetCoefficient(solver.LookupVariable(
-            create_const_name_activ(feature_instance)), -1)
+            create_const_name_activ_global(feature_instance)), -1)
         constraint = solver.Constraint(0, 0)
 
     # Feature >= parent * interval.lower
@@ -167,31 +167,19 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
 
         if feature_instance.parent is not None:
             # Auxiliary variable
-            v = solver.IntVar(min_lowerbound, big_M, 'v_' +  feature_instance.name + "_" + str(i))  # v = parent
+            v = solver.IntVar(0, big_M, 'v_' +  feature_instance.name + "_" + str(i))  # v = parent
             # * helper
-            l = solver.IntVar(v.lb() * interval.lower, v.ub() * interval.lower, 'lower_' +
-                              feature_instance.name + "_" + str(i))  # l
-            # = v * interval.lower
-            u = solver.IntVar(v.lb() * interval.upper, v.ub() * interval.upper, 'upper_' +
-                              feature_instance.name + "_" + str(i))  # u = v * interval.upper
-
-
 
             # Step 1: Linearize v = parent * helper (McCormick Envelopes)
-            solver.Add(v >= min_lowerbound * solver.LookupVariable(helper_name))
-            solver.Add(v >= big_M * solver.LookupVariable(helper_name) + solver.LookupVariable(
-                create_const_name(feature_instance.parent)) - big_M)
-            solver.Add(v <= min_lowerbound * solver.LookupVariable(helper_name) +
-            solver.LookupVariable(
-                create_const_name(feature_instance.parent)) - min_lowerbound)
+            solver.Add(v >= 0)
+            solver.Add(v >= solver.LookupVariable(
+                create_const_name(feature_instance.parent)) - big_M * solver.LookupVariable(
+                helper_name) - big_M)
+            solver.Add(v <= solver.LookupVariable(create_const_name(feature_instance.parent)))
             solver.Add(v <= big_M * solver.LookupVariable(helper_name))
 
-
-            solver.Add(l == interval.lower * v)
-            solver.Add(u == interval.upper * v)
-
-            constraint_lower.SetCoefficient(l,1)
-            constraint_upper.SetCoefficient(u,1)
+            constraint_lower.SetCoefficient(v,interval.lower)
+            constraint_upper.SetCoefficient(v,interval.upper)
         else:
             constraint.SetCoefficient(solver.LookupVariable(helper_name),interval.lower)
 
@@ -212,12 +200,8 @@ def create_ilp_constraints_for_feature_instance_cardinalities(feature_instance: 
             feature_instance)), -1)
 
 
-
-
     for child in feature_instance.children:
         create_ilp_constraints_for_feature_instance_cardinalities(child, solver)
-
-    
 
 
 def create_ilp_constraints_for_group_instance_cardinalities(feature_instance: Feature,
