@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "cfmtoolbox-ilp-encoder"
+version = "0.1.0"
+description = ""
+authors = ["upskk <upskk@student.kit.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+cfmtoolbox = "^0.4.0"
+
+
+[tool.poetry.plugins."cfmtoolbox.plugins"]
+cfmtoolbox-ilp-encoder = "cfmtoolbox_ilp_encoder"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

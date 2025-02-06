@@ -36,7 +36,7 @@ def create_ilp_multiset_encoding(cfm: CFM):
 
     create_ilp_constraints(cfm.constraints,solver)
 
-
+    print("Encoding complete.")
 
     #print("Number of variables =", solver.NumVariables())
     #print("Number of constraints =", solver.NumConstraints())
@@ -63,9 +63,9 @@ def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver
         for child in feature.children:
 
 
-            # child >= parent - M  +  M * helper1  If child >= parent, helper1 must be 1
-            helper_name_1 = "Active_helper_" + child.name + "_1"
-            solver.BoolVar(helper_name_1)
+            # child >= parent - M  +  M * child_active  If child >= parent, child_active must be 1
+            #helper_name_1 = "Active_helper_" + child.name + "_1"
+            #solver.BoolVar(helper_name_1)
 
             constraint_upper_local = solver.Constraint(-solver.infinity(), big_M)
             constraint_upper_local.SetCoefficient(solver.LookupVariable(create_const_name(
@@ -382,11 +382,9 @@ def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
         constraint.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(feature)), 1)
         constraint.SetCoefficient(solver.LookupVariable(create_const_name_activ(feature)), -1)
 
-        '''
-        constraint2 = solver.Constraint(0, solver.infinity())
-        constraint2.SetCoefficient(solver.LookupVariable(creat_const_name_activ_global(feature)),big_M)
-        constraint2.SetCoefficient(solver.LookupVariable(create_const_name(feature)),-1)
-        '''
+
+
+
 
 
 
