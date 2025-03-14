@@ -13,8 +13,7 @@ def create_ilp_multiset_encoding(cfm: CFM):
     print("Encoding CFM...")
 
     global big_M
-    big_M = get_global_upper_bound(cfm.root)
-
+    big_M = 10000000000000000
     # Create the linear solver with the GLOP backend will give double values as result,
     # which leeds to wrong results. Therefore CBC MILP is needed
     solver = pywraplp.Solver.CreateSolver("CBC")
