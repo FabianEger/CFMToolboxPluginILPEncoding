@@ -280,15 +280,21 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
     exclude_lower.SetCoefficient(helper2,lower_cardinality)
     exclude_lower.SetCoefficient(helper3,upper_cardinality + 1)
 
+    if lower_cardinality != 0:
+        excludes = solver.Constraint(0, 0)
 
+        excludes.SetCoefficient(helper1, 1)
+        excludes.SetCoefficient(helper2, 1)
+        excludes.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(feature)), -1)
+        if not (cardinality.__getitem__(0).lower == cardinality.__getitem__(0).upper):
+            excludes.SetCoefficient(helper3, 1)
+    else:
+        excludes = solver.Constraint(1, 1)
 
-    excludes = solver.Constraint(0,0)
-
-    excludes.SetCoefficient(helper1, 1)
-    excludes.SetCoefficient(helper2, 1)
-    excludes.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(feature)),-1)
-    if not ( cardinality.__getitem__(0).lower ==  cardinality.__getitem__(0).upper):
-        excludes.SetCoefficient(helper3, 1)
+        excludes.SetCoefficient(helper1, 1)
+        excludes.SetCoefficient(helper2, 1)
+        if not (cardinality.__getitem__(0).lower == cardinality.__getitem__(0).upper):
+            excludes.SetCoefficient(helper3, 1)
 
 
 def get_max_interval_value(intervals: list[Interval])-> int:
