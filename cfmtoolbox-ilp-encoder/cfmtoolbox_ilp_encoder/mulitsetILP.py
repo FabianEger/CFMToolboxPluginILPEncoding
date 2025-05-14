@@ -282,10 +282,11 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
 
 
 
-    excludes = solver.Constraint(1,1)
+    excludes = solver.Constraint(0,0)
 
     excludes.SetCoefficient(helper1, 1)
     excludes.SetCoefficient(helper2, 1)
+    excludes.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(feature)),-1)
     if not ( cardinality.__getitem__(0).lower ==  cardinality.__getitem__(0).upper):
         excludes.SetCoefficient(helper3, 1)
 

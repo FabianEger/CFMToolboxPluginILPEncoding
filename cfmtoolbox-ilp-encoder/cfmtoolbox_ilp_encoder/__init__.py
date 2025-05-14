@@ -26,10 +26,10 @@ def run_ilp_solver_maximize_cardinalities(cfm: CFM):
     find_actual_max(solver,cfm.root,1)
 
         #print(print(f"{feature.name} = {solver.Objective().Value():0.1f}"))
-
+    '''
     for variable in solver.variables():
         print(f"{variable.name()} = {variable.solution_value()}")
-
+    '''
     #print(solver.ExportModelAsLpFormat(False))
 
 def find_actual_max(solver, feature: Feature, max_parent_cardinality: int):
