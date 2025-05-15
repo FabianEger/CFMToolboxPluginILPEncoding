@@ -270,14 +270,14 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
                                                        "_" + str(constants_interval.upper))
 
     exclude_upper.SetCoefficient(helper1, lower_cardinality)
-    exclude_upper.SetCoefficient(helper2,upper_cardinality + 1)
+    exclude_upper.SetCoefficient(helper2,upper_cardinality)
     exclude_upper.SetCoefficient(helper3, big_M)
 
     exclude_lower = solver.Constraint(-solver.infinity(),0)
     exclude_lower.SetCoefficient(solver.LookupVariable(create_const_name(
         feature)), -1)
     exclude_lower.SetCoefficient(helper1,1)
-    exclude_lower.SetCoefficient(helper2,lower_cardinality)
+    exclude_lower.SetCoefficient(helper2,lower_cardinality + 1)
     exclude_lower.SetCoefficient(helper3,upper_cardinality + 1)
 
     if lower_cardinality != 0:
