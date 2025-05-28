@@ -45,7 +45,7 @@ def run_ilp_solver_minimize_cardinalities(cfm: CFM):
 
 def find_actual_min(solver, feature: Feature):
 
-    solver.Minmize(solver.LookupVariable(create_const_name(feature)))
+    solver.Minimize(solver.LookupVariable(create_const_name(feature)))
     status = solver.Solve()
     #solver.EnableOutput()
     if status == 0 or status == 1:
