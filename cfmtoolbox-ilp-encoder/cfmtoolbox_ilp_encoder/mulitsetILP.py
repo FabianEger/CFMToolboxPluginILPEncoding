@@ -58,7 +58,6 @@ def create_ilp_constraints_for_group_type_cardinalities(feature: Feature, solver
         #constraint = solver.Constraint(min_lowerbound, max_upperbound)
 
         for child in feature.children:
-            # child >= parent - M  +  M * child_active  If child >= parent, child_active must be 1
             helper_name_1 = "Active_helper_" + child.name + "_1"
             helper = solver.BoolVar(helper_name_1)
             solver.Add(solver.LookupVariable(create_const_name(child)) - solver.LookupVariable(
@@ -259,8 +258,7 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
 
     lower_cardinality = 0 if cardinality.__getitem__(0).lower == 0 else (cardinality.__getitem__(
         0).lower - 1)
-    upper_cardinality =  cardinality.__getitem__(
-                                     0).upper
+    upper_cardinality =  cardinality.__getitem__(0).upper
 
     helper1 = solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.lower))
@@ -322,7 +320,14 @@ def get_min_interval_value(intervals: list[Interval])-> int:
 def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
     global big_M
     for feature in cfm.features:
-        solver.IntVar(0, solver.infinity() , create_const_name(feature)) # Big M is needed here because the
+
+        if feature.parent is None:
+            max_cardinality = 1
+        else:
+            max_cardinality = get_max_interval_value(feature.parent.instance_cardinality.intervals)
+
+        solver.IntVar(0, big_M * max_cardinality , create_const_name(feature)) # Big M is needed here because
+        # the
         # solver needs the variables to have a maximum
         solver.BoolVar(create_const_name_activ(feature))
 
