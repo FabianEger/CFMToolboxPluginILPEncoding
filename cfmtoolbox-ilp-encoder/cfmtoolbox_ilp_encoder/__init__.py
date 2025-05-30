@@ -11,7 +11,7 @@ def encode_to_ilp_multiset(cfm: CFM) -> str:
 
 @app.command()
 def get_ilp_multiset_stats(cfm: CFM):
-    solver = create_ilp_multiset_encoding(cfm)
+    solver = create_ilp_multiset_encoding(cfm,True)
     print_solver_stats(solver)
 
 def print_solver_stats(solver):
@@ -22,52 +22,61 @@ def print_solver_stats(solver):
 
 @app.command()
 def run_ilp_solver_bound_analysis(cfm: CFM):
-    solver = create_ilp_multiset_encoding(cfm)
-    find_actual_min(solver,cfm.root)
+    solver = create_ilp_multiset_encoding(cfm,True)
+    find_actual_min(solver,cfm.root,1)
+    """
+    for variable in solver.variables():
+        print(f"{variable.name()} = {variable.solution_value()}")
+    """
     find_actual_max(solver,cfm.root,1)
 
 @app.command()
 def run_ilp_solver_maximize_cardinalities(cfm: CFM):
-    solver = create_ilp_multiset_encoding(cfm)
+    solver = create_ilp_multiset_encoding(cfm,True)
     find_actual_max(solver,cfm.root,1)
 
         #print(print(f"{feature.name} = {solver.Objective().Value():0.1f}"))
 
-    #for variable in solver.variables():
-    #    print(f"{variable.name()} = {variable.solution_value()}")
+
 
     #print(solver.ExportModelAsLpFormat(False))
 
 @app.command()
 def run_ilp_solver_minimize_cardinalities(cfm: CFM):
-    solver = create_ilp_multiset_encoding(cfm)
-    find_actual_min(solver,cfm.root)
+    solver = create_ilp_multiset_encoding(cfm,False)
+    find_actual_min(solver,cfm.root,1)
 
-def find_actual_min(solver, feature: Feature):
+def find_actual_min(solver, feature: Feature, min_parent_cardinality: int):
 
     solver.Minimize(solver.LookupVariable(create_const_name(feature)))
     status = solver.Solve()
     #solver.EnableOutput()
     if status == 0 or status == 1:
         value = solver.Objective().Value()
+        if int(solver.Objective().Value()) > 1:
+            actual_min = int(solver.Objective().Value()) / min_parent_cardinality
+            actual_min = round(actual_min)
+            min_parent_cardinality = round(min_parent_cardinality * actual_min, None)
+        else:
+            actual_min = int(solver.Objective().Value())
 
-        if value > get_min_interval_value(feature.instance_cardinality.intervals):
+        if round(actual_min) > get_min_interval_value(feature.instance_cardinality.intervals):
             print(feature.name + ": ")
             print("Given feature instance cardinality: " + str(get_min_interval_value(
                 feature.instance_cardinality.intervals)) + "\n")
-            print("Actual Min Feature Instance Cardinality " + str(round(value, None)) + "\n")
+            print("Actual Min Feature Instance Cardinality " + str(round(actual_min)) + "\n")
     else:
-        print(status)
+        print("No solution found")
     for child in feature.children:
-        find_actual_min(solver, child)
+        find_actual_min(solver, child,min_parent_cardinality)
 
 def find_actual_max(solver, feature: Feature, max_parent_cardinality: int):
 
     solver.Maximize(solver.LookupVariable(create_const_name(feature)))
     status = solver.Solve()
-    # solver.EnableOutput()
+    #solver.EnableOutput()
     if status == 0 or status == 1:
-        print(solver.Objective().Value())
+
         if int(solver.Objective().Value()) > 1:
             actual_max = int(solver.Objective().Value()) / max_parent_cardinality
             new_max = round(max_parent_cardinality * actual_max, None)
@@ -82,7 +91,7 @@ def find_actual_max(solver, feature: Feature, max_parent_cardinality: int):
             print("Actual Max Feature Instance Cardinality " + str(
                 round(actual_max, None)) + "\n")
     else:
-        print(status)
+        print("No solution found")
         new_max = 1
     for child in feature.children:
         find_actual_max(solver, child, new_max)

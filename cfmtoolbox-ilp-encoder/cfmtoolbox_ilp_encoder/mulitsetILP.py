@@ -9,7 +9,7 @@ from cfmtoolbox.models import Constraint
 
 big_M = 0
 
-def create_ilp_multiset_encoding(cfm: CFM):
+def create_ilp_multiset_encoding(cfm: CFM, maximization: bool):
     print("Encoding CFM...")
 
     global big_M
@@ -24,8 +24,9 @@ def create_ilp_multiset_encoding(cfm: CFM):
 
     create_ilp_multiset_variables(cfm, solver)
 
+    if maximization:
+        create_ilp_constraints_for_group_type_cardinalities(cfm.root,solver)
 
-    create_ilp_constraints_for_group_type_cardinalities(cfm.root,solver)
 
     create_ilp_constraints_for_group_type_cardinalities_with_less_max_than_features(cfm.root,
                                                                                     solver)
@@ -118,7 +119,7 @@ def create_ilp_constraints_for_group_type_cardinalities_with_less_max_than_featu
         constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(
             feature)),
                                         -max_upperbound)
-        print(min_lowerbound)
+        #print(min_lowerbound)
 
         for child in feature.children:
             create_ilp_constraints_for_group_type_cardinalities_with_less_max_than_features(child, solver)
@@ -208,7 +209,7 @@ def create_ilp_constraints_for_group_instance_cardinalities(feature_instance: Fe
 
         constraint_upper.SetCoefficient(solver.LookupVariable(create_const_name(
             feature_instance)),-max_upperbound)
-        print(max_upperbound)
+       # print(max_upperbound)
         for child in feature_instance.children:
             create_ilp_constraints_for_group_instance_cardinalities(child, solver)
 
@@ -252,13 +253,11 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
         solver.BoolVar("helper_constraint_" + str(constraint_number) + "_" + str(i))
 
 
-    exclude_upper = solver.Constraint(0, solver.infinity())
-    exclude_upper.SetCoefficient(solver.LookupVariable(create_const_name(
-        feature)), -1)
 
-    lower_cardinality = 0 if cardinality.__getitem__(0).lower == 0 else (cardinality.__getitem__(
-        0).lower - 1)
+
+    lower_cardinality = cardinality.__getitem__(0).lower
     upper_cardinality =  cardinality.__getitem__(0).upper
+    lower_bound = lower_cardinality - 1 if lower_cardinality > 0 else 0
 
     helper1 = solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.lower))
@@ -267,32 +266,26 @@ def create_constraint_for_intervals(solver:Solver, constraint_number:int, featur
     helper3 = solver.LookupVariable("helper_constraint_" + str(constraint_number) +
                                                        "_" + str(constants_interval.upper))
 
-    exclude_upper.SetCoefficient(helper1, lower_cardinality)
-    exclude_upper.SetCoefficient(helper2,upper_cardinality)
-    exclude_upper.SetCoefficient(helper3, big_M)
+    feature_variable = solver.LookupVariable(create_const_name(feature))
 
-    exclude_lower = solver.Constraint(-solver.infinity(),0)
-    exclude_lower.SetCoefficient(solver.LookupVariable(create_const_name(
-        feature)), -1)
-    exclude_lower.SetCoefficient(helper1,1)
-    exclude_lower.SetCoefficient(helper2,lower_cardinality + 1)
-    exclude_lower.SetCoefficient(helper3,upper_cardinality + 1)
+    solver.Add(feature_variable <= lower_bound * helper1 + upper_cardinality * helper2 + big_M *
+               helper3)
 
-    if lower_cardinality != 0:
-        excludes = solver.Constraint(0, 0)
+    solver.Add(feature_variable >=  lower_cardinality * helper2 + (upper_cardinality + 1) * helper3)
 
-        excludes.SetCoefficient(helper1, 1)
+
+    if lower_cardinality == 0:
+        excludes = solver.Constraint(1, 1)
         excludes.SetCoefficient(helper2, 1)
-        excludes.SetCoefficient(solver.LookupVariable(create_const_name_activ_global(feature)), -1)
-        if not (cardinality.__getitem__(0).lower == cardinality.__getitem__(0).upper):
-            excludes.SetCoefficient(helper3, 1)
+
+        excludes.SetCoefficient(helper3, 1)
     else:
         excludes = solver.Constraint(1, 1)
 
         excludes.SetCoefficient(helper1, 1)
         excludes.SetCoefficient(helper2, 1)
-        if not (cardinality.__getitem__(0).lower == cardinality.__getitem__(0).upper):
-            excludes.SetCoefficient(helper3, 1)
+
+        excludes.SetCoefficient(helper3, 1)
 
 
 def get_max_interval_value(intervals: list[Interval])-> int:
@@ -326,7 +319,7 @@ def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
         else:
             max_cardinality = get_max_interval_value(feature.parent.instance_cardinality.intervals)
 
-        solver.IntVar(0, big_M * max_cardinality , create_const_name(feature)) # Big M is needed here because
+        solver.IntVar(0, max_cardinality , create_const_name(feature)) # Big M is needed here because
         # the
         # solver needs the variables to have a maximum
         solver.BoolVar(create_const_name_activ(feature))
