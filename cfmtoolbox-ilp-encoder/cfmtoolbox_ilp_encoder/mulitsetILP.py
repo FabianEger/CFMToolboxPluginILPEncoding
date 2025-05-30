@@ -319,7 +319,8 @@ def create_ilp_multiset_variables(cfm: CFM, solver: Solver):
         else:
             max_cardinality = get_max_interval_value(feature.parent.instance_cardinality.intervals)
 
-        solver.IntVar(0, max_cardinality , create_const_name(feature)) # Big M is needed here because
+        solver.IntVar(0, max_cardinality * big_M, create_const_name(feature)) # Big M is needed here
+        # because
         # the
         # solver needs the variables to have a maximum
         solver.BoolVar(create_const_name_activ(feature))
